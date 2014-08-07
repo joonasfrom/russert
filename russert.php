@@ -73,7 +73,7 @@ class Russert {
 	 */
 	
 	function getSources() {
-		$files = glob("sources/*.php");
+		$files = glob(SOURCE_FOLDER . "/*.php");
 		
 		if ($files) {
 			foreach ($files as &$file) {
@@ -234,7 +234,7 @@ class Russert {
 		$collection = $this->db->item;
 		
 		if ($collection && $source_name) {
-			$cursor = $collection->find(array('source' => $source_name))->sort(array('seen' => 1))->limit($limit);
+			$cursor = $collection->find(array('source' => $source_name))->sort(array('seen' => -1))->limit($limit);
 			
 			if ($cursor) {
 				$items = array();
