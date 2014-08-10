@@ -80,7 +80,7 @@ class Russert {
 				$file = end(explode("/", $file));
 				$file = reset(explode(".php", $file));
 			}
-			
+
 			return $files;
 		}
 		
@@ -164,13 +164,12 @@ class Russert {
 		
 		if ($source_names) {
 			foreach ($source_names as $source_name) {
-				$items = $this->getLatestItemsBySource($source_name);
+				$this->loadSource($source_name);
+				$source_object = new $source_name;
+				
+				$items = $this->getLatestItemsBySource($source_object->name);
 				
 				if ($items) {
-					// Load source.
-					$this->loadSource($source_name);
-					$source_object = new $source_name;
-					
 					$this->saveRssFile($items, $source_object);
 				}
 			}
@@ -433,7 +432,7 @@ class Russert {
 	/**
 	 * A simple log function that will also log to Witness in the future.
 	 * @param String $message A message to be logged.
-	 * @param Boolean $bad If this is bad or not. Bad things are mailed and printed out after the importer shuts down.
+	 * @param Boolean $bad If this is bad or not. Bad things are mailed and printed out after the script shuts down.
 	 **/
 	
 	function log($message, $bad = FALSE) {

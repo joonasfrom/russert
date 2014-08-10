@@ -24,7 +24,7 @@
 			<?php if ($item['image']):?>
 			<?php endif;?>
 			<pubDate><?=date("r", $item['seen']->sec);?></pubDate>
-			<guid><?=$item['link'];?></guid>
+			<guid><?=$item['guid'];?></guid>
 		</item>
 <?php endforeach;?>
 </channel>
