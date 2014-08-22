@@ -1,4 +1,5 @@
 <?php
+PHP_SAPI == 'cli' or die();
 require("config.php");
 require("source.php");
 new Russert();
@@ -27,8 +28,37 @@ class Russert {
 			die();
 		}
 		
-		// Load all available sources.
-		$sources = $this->getSources();
+		$single_source = "";
+		
+		// Check custom command-line parameters.
+		if (!empty($_SERVER['argv']) && count($_SERVER['argv'] > 1)) {
+			// Unset the first since it's the script name.
+			unset($_SERVER['argv'][0]);
+			
+			foreach ($_SERVER['argv'] as $argument) {
+				
+				if (strpos($argument, "--source=") !== FALSE) {
+					$single_source = explode("--source=", $argument)[1];
+				}
+				elseif ($argument == "--help" || $argument == "-h") {
+					echo "Russert RSS file generator\n";
+					echo "Usage: php russert.php [OPTIONS]\n";
+					echo "    --source=SOURCE NAME   Only process a single source.\n";
+					echo "-h, --help                 Display this message\n";
+					die();
+				}
+			}
+		}
+		
+		$sources = array();
+		
+		// Load all available sources if the single source mode isn't on.
+		if ($single_source) {
+			$sources[] = $single_source;
+		}
+		else {
+			$sources = $this->getSources();
+		}
 		
 		if (!$sources) {
 			$this->log("No sources found.");
@@ -90,6 +120,8 @@ class Russert {
 	
 	/**
 	 * Load a source based on its class name.
+	 *
+	 * @return Boolean True if loading was successful, false if not.
 	 */
 	
 	function loadSource($name) {
@@ -107,6 +139,7 @@ class Russert {
 	
 	/**
 	 * Handles all sources.
+	 *
 	 * @return Boolean True/false on success/fail.
 	 */
 	
@@ -140,22 +173,29 @@ class Russert {
 	function handleCargo($source) {
 		$cargo = $source->getCargo();
 		
-		foreach ($cargo as $item) {
-			// Try getting the same item from the database.
-			if ($this->itemExists($item)) {
-				$this->log("Item " . $item['guid'] . " from source " . $source->getSourceName() . " already exists, skipping.");
+		if ($cargo) {
+			foreach ($cargo as $item) {
+				// Try getting the same item from the database.
+				if ($this->itemExists($item)) {
+					$this->log("Item " . $item['guid'] . " from source " . $source->getSourceName() . " already exists, skipping.");
+				}
+				else {
+					// Insert the item.
+					$this->log("Item " . $item['guid'] . " found, saving.");
+					$this->saveItem($item, $source->getSourceName());
+				}
 			}
-			else {
-				// Insert the item.
-				$this->log("Item " . $item['guid'] . " found, saving.");
-				$this->saveItem($item, $source->getSourceName());
-			}
+		}
+		else {
+			$this->log("Couldn't get any items from " . $source->getSourceName());
 		}
 	}
 	
 	
 	/**
 	 * Handles RSS files to the disk.
+	 *
+	 * @return Boolean True on success, false on fail.
 	 */
 	
 	function handleRssFiles() {
@@ -164,31 +204,52 @@ class Russert {
 		
 		if ($source_names) {
 			foreach ($source_names as $source_name) {
-				$this->loadSource($source_name);
-				$source_object = new $source_name;
-				
-				$items = $this->getLatestItemsBySource($source_object->name);
-				
-				if ($items) {
-					$this->saveRssFile($items, $source_object);
+				if ($this->loadSource($source_name)) {
+					$source_object = new $source_name;
+
+					$items = $this->getLatestItemsBySourceName($source_object->name);
+
+					if ($items) {
+						if ($this->saveRssFile($items, $source_object)) {
+							return TRUE;
+						}
+					}
+				}
+				else {
+					$this->log("Loading source " . $source_name . " failed.");
+					break;
 				}
 			}
 		}
+		
+		return FALSE;
 	}
+	
+	
+	/**
+	 * Saves the RSS file to the disk using items and the source.
+	 *
+	 * @return Boolean True on success, false on fail.
+	 */
 	
 	function saveRssFile(array $items, $source) {
 		ob_start();
-		require("rss.tpl.php");
+		require_once("rss.tpl.php");
 		$html = ob_get_contents();
 		ob_end_clean();
 		
-		file_put_contents(RSS_FOLDER . "/" . $source->name . ".xml", $html);
+		if (file_put_contents(RSS_FOLDER . "/" . $source->name . ".xml", $html)) {
+			return TRUE;
+		}
+		
+		return FALSE;
 	}
 	
 	
 	/**
 	 * Check if item exists.
 	 * @param Array $item Item array.
+	 *
 	 * @return Boolean True if the item exists, false if it doesn't.
 	 */
 	
@@ -211,6 +272,7 @@ class Russert {
 	
 	/**
 	 * Returns an item from MongoDB by GUID.
+	 *
 	 * @return Mixed Item array or FALSE
 	 */
 	
@@ -229,7 +291,14 @@ class Russert {
 	}
 	
 	
-	function getLatestItemsBySource($source_name, $limit = 20) {
+	/**
+	 * Returns an array of latest items by source.
+	 * @param String $source_name Name of the source.
+	 * @param Integer $limit How many to return at most.
+	 *
+	 * @return Mixed Array of items or false if nothing found.
+	 */
+	function getLatestItemsBySourceName($source_name, $limit = 20) {
 		$collection = $this->db->item;
 		
 		if ($collection && $source_name) {
@@ -256,6 +325,8 @@ class Russert {
 	 * Save item.
 	 * @param Array $item Item array to be saved.
 	 * @param String $source_name The source name.
+	 *
+	 * @return Mixed The item array on success or false on fail.
 	 */
 	
 	function saveItem($item, $source_name) {
@@ -284,6 +355,7 @@ class Russert {
 	/**
 	 * A simple item validator.
 	 * @param Array $item Item to be validated.
+	 *
 	 * @return Boolean True if the item is valid, false if not.
 	 */
 	

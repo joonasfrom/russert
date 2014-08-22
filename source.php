@@ -3,13 +3,22 @@
  * Interface for sources. Source files must be named EXACTLY like the class inside the file.
  * 
  */
+
 interface SourceInterface {
 	public function getSourceName();
 	public function getCargo();
-	public function validateCargo();
 }
 
+
+/**
+ * Source class for shared functionalities.
+ */
+
 class Source {
+	/**
+	 * Constructor.
+	 */
+	
 	function __construct() {
 		if (empty($this->name)) {
 			die("Missing name.");
@@ -24,28 +33,23 @@ class Source {
 		}
 	}
 	
-	public function validateCargo() {
-		$cargo = $this->getCargo();
-		
-		// Keys to validate.
-		$keys = array("title", "link", "guid");
-		
-		if ($cargo) {
-			foreach ($cargo as $item) {
-				foreach ($keys as $key) {
-					if (empty($item[$key])) {
-						return FALSE;
-					}
-				}
-			}
-		}
-		
-		return TRUE;
-	}
+	
+	/**
+	 * Return the source name.
+	 *
+	 * @return String The source name.
+	 */
 	
 	public function getSourceName() {
 		return $this->name;
 	}
+	
+	
+	/**
+	 * Returns the HTML DOM.
+	 *
+	 * @return Mixed DOMDocument on success, false on fail.
+	 */
 	
 	public function getHtmlDom() {
 		$html = file_get_contents($this->link);
