@@ -68,7 +68,7 @@ class Russert {
 		$this->handleSources($sources);
 		
 		// Output RSS files.
-		$this->handleRssFiles();
+		$this->handleRssFiles($sources);
 	}
 	
 	
@@ -198,10 +198,8 @@ class Russert {
 	 * @return Boolean True on success, false on fail.
 	 */
 	
-	function handleRssFiles() {
+	function handleRssFiles($source_names) {
 		// Get different sources.
-		$source_names = $this->getSources();
-		
 		if ($source_names) {
 			foreach ($source_names as $source_name) {
 				if ($this->loadSource($source_name)) {
@@ -210,9 +208,8 @@ class Russert {
 					$items = $this->getLatestItemsBySourceName($source_object->name);
 
 					if ($items) {
-						if ($this->saveRssFile($items, $source_object)) {
-							return TRUE;
-						}
+						$this->log("Generating RSS feed for " . $source_name);
+						$this->saveRssFile($items, $source_object);
 					}
 				}
 				else {
@@ -234,7 +231,7 @@ class Russert {
 	
 	function saveRssFile(array $items, $source) {
 		ob_start();
-		require_once("rss.tpl.php");
+		require("rss.tpl.php");
 		$html = ob_get_contents();
 		ob_end_clean();
 		

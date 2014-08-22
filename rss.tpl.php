@@ -13,7 +13,7 @@
 			<link><?=htmlspecialchars($item['link'])?></link>
 			<description>
 				<![CDATA[
-				<?php if ($item['image']):?>
+				<?php if (!empty($item['image'])):?>
 				<img src="<?=$item['image'];?>" alt="" />
 				<?php endif;?>
 				<?php if (!empty($item['description'])):?>
@@ -21,8 +21,6 @@
 				<?php endif;?>
 				]]>
 			</description>
-			<?php if ($item['image']):?>
-			<?php endif;?>
 			<pubDate><?=date("r", $item['seen']->sec);?></pubDate>
 			<guid><?=$item['guid'];?></guid>
 		</item>
