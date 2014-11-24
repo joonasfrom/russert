@@ -181,7 +181,7 @@ class Russert {
 				}
 				else {
 					// Insert the item.
-					$this->log("Item " . $item['guid'] . " found, saving.");
+					$this->log("Item " . $item['guid'] . " found from source " . $source->getSourceName() . ", saving.");
 					$this->saveItem($item, $source->getSourceName());
 				}
 			}

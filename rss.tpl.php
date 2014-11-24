@@ -18,6 +18,8 @@
 				<?php endif;?>
 				<?php if (!empty($item['description'])):?>
 					<p><?=htmlspecialchars($item['description']);?></p>
+				<?php else:?>
+					<p>N/A</p>
 				<?php endif;?>
 				]]>
 			</description>
