@@ -52,14 +52,16 @@ class Source {
 	 */
 	
 	public function getHtmlDom() {
-		$html = file_get_contents($this->link);
+		$html = @file_get_contents($this->link);
 		
-		$doc = new DOMDocument();
-	  $doc->strictErrorChecking = FALSE;
-	  @$doc->loadHTML($html);
+		if ($html) {
+			$doc = new DOMDocument();
+		  $doc->strictErrorChecking = FALSE;
+		  @$doc->loadHTML($html);
 		
-		if ($doc) {
-			return $doc;
+			if ($doc) {
+				return $doc;
+			}
 		}
 		
 		return FALSE;
