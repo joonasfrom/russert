@@ -28,6 +28,12 @@ class Russert {
 			die();
 		}
 		
+		// Set some indexes.
+		if (!$this->ensureIndexes()) {
+			$this->log("Couldn't create indexes to MongoDB.");
+			die();
+		}
+		
 		$single_source = "";
 		
 		// Check custom command-line parameters.
@@ -74,7 +80,7 @@ class Russert {
 	
 	/**
 	 * Do these when we are quitting.
-	 **/
+	 */
 	
 	function __destruct() {
 		// Kill database connection.
@@ -373,7 +379,7 @@ class Russert {
 	 * Set lock.
 	 *
 	 * @return Boolean Success/fail.
-	 **/	
+	 */	
 	
 	function setLock() {
 		// Lock is disabled.
@@ -444,7 +450,7 @@ class Russert {
 	 * Connects to MongoDB and sets $this->db.
 	 *
 	 * @return Boolean True/false.
-	 **/
+	 */
 	
 	function connectMongo() {
 		if ($connection = new Mongo("mongodb://" . MONGODB_HOST)) {
@@ -455,11 +461,39 @@ class Russert {
 		
 		return FALSE;
 	}
+	
+	
+	/**
+	 * Just a simple function to ensure that we have correct MongoDB indexes in the collection(s).
+	 *
+	 * @return boolean True/false.
+	 * @author Joonas Kokko
+	 */
+	function ensureIndexes() {
+		if ($this->db && $collection = $this->db->item) {
+			if (!$collection->createIndex(array('guid' => 1))) {
+				return FALSE;
+			}
+			
+			if (!$collection->createIndex(array('source' => 1))) {
+				return FALSE;
+			}
+			
+			if (!$collection->createIndex(array('seen' => -1))) {
+				return FALSE;
+			}
+			
+			return TRUE;
+		}
+		
+		// Argh.
+		return FALSE;
+	}
 
 
 	/**
 	 * Handles encountered errors by printing them out and mailing them.
-	 **/
+	 */
 	 
 	function handleErrors() {
 		if ($this->errors) {
@@ -478,7 +512,7 @@ class Russert {
 	
 	/**
 	 * Compile one mail from a set of errors.
-	 **/
+	 */
 	 
 	function sendMails(array $mails) {
 		if ($mails && !DEBUG_MODE) {
@@ -502,7 +536,7 @@ class Russert {
 	 * A simple log function that will also log to Witness in the future.
 	 * @param String $message A message to be logged.
 	 * @param Boolean $bad If this is bad or not. Bad things are mailed and printed out after the script shuts down.
-	 **/
+	 */
 	
 	function log($message, $bad = FALSE) {
 		echo date('c') . ": " . $message . "\n";
