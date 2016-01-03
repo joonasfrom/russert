@@ -9,20 +9,20 @@
 	<atom:link href="<?=htmlspecialchars(RSS_URL . "/" . $source->name) . ".xml";?>" rel="self" type="application/rss+xml" />
 <?php foreach ($items as $item):?>
 		<item>
-			<title><?=htmlspecialchars($item['title'])?></title>
-			<link><?=htmlspecialchars($item['link'])?></link>
+			<title><?=htmlspecialchars($item->title)?></title>
+			<link><?=htmlspecialchars($item->link)?></link>
 			<description>
 				<![CDATA[
-				<?php if (!empty($item['image'])):?>
-				<img src="<?=$item['image'];?>" alt="" />
+				<?php if (!empty($item->image)):?>
+				<img src="<?=$item->image;?>" alt="" />
 				<?php endif;?>
-				<?php if (!empty($item['description'])):?>
-					<p><?=htmlspecialchars($item['description']);?></p>
+				<?php if (!empty($item->description)):?>
+					<p><?=htmlspecialchars($item->description);?></p>
 				<?php endif;?>
 				]]>
 			</description>
-			<pubDate><?=date("r", $item['seen']->sec);?></pubDate>
-			<guid><?=$item['guid'];?></guid>
+			<pubDate><?=date("r", ($item->seen->__toString() / 1000));?></pubDate>
+			<guid><?=$item->guid;?></guid>
 		</item>
 <?php endforeach;?>
 </channel>

@@ -2,10 +2,12 @@
 PHP_SAPI == 'cli' or die();
 require("config.php");
 require("source.php");
+require "vendor/autoload.php";
 new Russert();
 
 class Russert {
-	private $db;
+	private $connection;
+	private $collection;
 	private $errors;
 	private $locked;
 	
@@ -25,6 +27,12 @@ class Russert {
 		// Connect to MongoDB.
 		if (!$this->connectMongo()) {
 			$this->log("Couldn't connect to MongoDB.");
+			die();
+		}
+		
+		// Set collection.
+		if (!$this->collection = new MongoDB\Collection($this->connection, "russert.item")) {
+			$this->log("Collection setting failed.");
 			die();
 		}
 		
@@ -84,7 +92,7 @@ class Russert {
 	
 	function __destruct() {
 		// Kill database connection.
-		unset($this->db);
+		unset($this->connection);
 		
 		// Handle errors.
 		$this->handleErrors();
@@ -113,8 +121,10 @@ class Russert {
 		
 		if ($files) {
 			foreach ($files as &$file) {
-				$file = end(explode("/", $file));
-				$file = reset(explode(".php", $file));
+				$file = explode("/", $file);
+				$file = end($file);
+				$file = explode(".php", $file);
+				$file = reset($file);
 			}
 
 			return $files;
@@ -152,8 +162,10 @@ class Russert {
 	function handleSources(array $sources) {
 		foreach ($sources as $source) {
 			// Take only the base name.
-			$class_name = end(explode("/", $source));
-			$class_name = reset(explode(".php", $class_name));
+			$source = explode("/", $source);
+			$class_name = end($source);
+			$class_name = explode(".php", $class_name);
+			$class_name = reset($class_name);
 			
 			if ($this->loadSource($class_name)) {
 				// Create the object.
@@ -280,10 +292,8 @@ class Russert {
 	 */
 	
 	function getItemByGuid($guid) {
-		$collection = $this->db->item;
-		
-		if ($collection && $guid) {
-			$item = $collection->findOne(array('guid' => $guid));
+		if ($this->collection && $guid) {
+			$item = $this->collection->findOne(array('guid' => $guid));
 			
 			if ($item) {
 				return $item;
@@ -302,10 +312,8 @@ class Russert {
 	 * @return Mixed Array of items or false if nothing found.
 	 */
 	function getLatestItemsBySourceName($source_name, $limit = 20) {
-		$collection = $this->db->item;
-		
-		if ($collection && $source_name) {
-			$cursor = $collection->find(array('source' => $source_name))->sort(array('seen' => -1))->limit($limit);
+		if ($this->collection && $source_name) {
+			$cursor = $this->collection->find(array('source' => $source_name), array("sort" => array('seen' => -1), "limit" => $limit));
 			
 			if ($cursor) {
 				$items = array();
@@ -336,17 +344,14 @@ class Russert {
 		// Validate the item.
 		if ($this->isItemValid($item)) {
 			// Set date.
-			$item['seen'] = new MongoDate();
+			$item['seen'] = new MongoDB\BSON\UTCDateTime(round(microtime(TRUE) * 1000));
 
 			// Add source.
 			$item['source'] = $source_name;
 
 			// Save.
-			$collection = $this->db->item;
-
-			if ($collection) {
-				$collection->save($item, array('w' => 1));
-
+			if ($this->collection) {
+				$this->collection->insertOne($item);
 				return $item;
 			}
 		}
@@ -447,16 +452,14 @@ class Russert {
 	
 	
 	/**
-	 * Connects to MongoDB and sets $this->db.
+	 * Connects to MongoDB and sets $this->connection.
 	 *
 	 * @return Boolean True/false.
 	 */
 	
 	function connectMongo() {
-		if ($connection = new Mongo("mongodb://" . MONGODB_HOST)) {
-			if ($this->db = $connection->selectDB("russert")) {
-				return TRUE;
-			}
+		if ($this->connection = new MongoDB\Driver\Manager("mongodb://" . MONGODB_HOST)) {
+			return TRUE;
 		}
 		
 		return FALSE;
@@ -470,16 +473,17 @@ class Russert {
 	 * @author Joonas Kokko
 	 */
 	function ensureIndexes() {
-		if ($this->db && $collection = $this->db->item) {
-			if (!$collection->createIndex(array('guid' => 1))) {
+		return TRUE;
+		if ($this->connection && $this->collection) {
+			if (!$this->collection->createIndex(array('guid' => 1))) {
 				return FALSE;
 			}
 			
-			if (!$collection->createIndex(array('source' => 1))) {
+			if (!$this->collection->createIndex(array('source' => 1))) {
 				return FALSE;
 			}
 			
-			if (!$collection->createIndex(array('seen' => -1))) {
+			if (!$this->collection->createIndex(array('seen' => -1))) {
 				return FALSE;
 			}
 			
