@@ -31,7 +31,7 @@ class Russert {
 		}
 		
 		// Set collection.
-		if (!$this->collection = new MongoDB\Collection($this->connection, "russert.item")) {
+		if (!$this->collection = new MongoDB\Collection($this->connection, "russert", "item")) {
 			$this->log("Collection setting failed.");
 			die();
 		}
@@ -473,7 +473,6 @@ class Russert {
 	 * @author Joonas Kokko
 	 */
 	function ensureIndexes() {
-		return TRUE;
 		if ($this->connection && $this->collection) {
 			if (!$this->collection->createIndex(array('guid' => 1))) {
 				return FALSE;
