@@ -45,7 +45,7 @@ class Russert {
 		$single_source = "";
 		
 		// Check custom command-line parameters.
-		if (!empty($_SERVER['argv']) && count($_SERVER['argv'] > 1)) {
+		if (!empty($_SERVER['argv']) && is_array($_SERVER) && count($_SERVER['argv']) > 1) {
 			// Unset the first since it's the script name.
 			unset($_SERVER['argv'][0]);
 			
@@ -189,23 +189,28 @@ class Russert {
 	 */
 	
 	function handleCargo($source) {
-		$cargo = $source->getCargo();
+		try {
+			$cargo = $source->getCargo();
 		
-		if ($cargo) {
-			foreach ($cargo as $item) {
-				// Try getting the same item from the database.
-				if ($this->itemExists($item)) {
-					$this->log("Item " . $item['guid'] . " from source " . $source->getSourceName() . " already exists, skipping.");
-				}
-				else {
-					// Insert the item.
-					$this->log("Item " . $item['guid'] . " found from source " . $source->getSourceName() . ", saving.");
-					$this->saveItem($item, $source->getSourceName());
+			if ($cargo) {
+				foreach ($cargo as $item) {
+					// Try getting the same item from the database.
+					if ($this->itemExists($item)) {
+						$this->log("Item " . $item['guid'] . " from source " . $source->getSourceName() . " already exists, skipping.");
+					}
+					else {
+						// Insert the item.
+						$this->log("Item " . $item['guid'] . " found from source " . $source->getSourceName() . ", saving.");
+						$this->saveItem($item, $source->getSourceName());
+					}
 				}
 			}
+			else {
+				$this->log("Couldn't get any items from " . $source->getSourceName());
+			}
 		}
-		else {
-			$this->log("Couldn't get any items from " . $source->getSourceName());
+		catch (Exception $e) {
+			$this->log("Something went horribly wrong while trying to get cargo from source.");
 		}
 	}
 	
