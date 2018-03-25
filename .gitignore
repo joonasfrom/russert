@@ -1,5 +1,4 @@
 rss/
 vendor/
-composer.lock
-sources/*.php
+sources/
 config.php

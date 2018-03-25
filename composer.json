@@ -1,5 +1,12 @@
 {
-    "require": {
-        "mongodb/mongodb": "1.0.2"
-    }
+	"autoload" : {
+		"psr-4" : {
+			"Russert\\" : [ "src/" ],
+			"Russert\\Sources\\" : "sources/",
+			"Russert\\Abstracts\\" : "sources/abstracts/"
+		}
+	},
+	"require" : {
+		"mongodb/mongodb": "1.0.2"
+	}
 }

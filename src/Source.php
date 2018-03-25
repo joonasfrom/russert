@@ -1,20 +1,13 @@
 <?php
-/**
- * Interface for sources. Source files must be named EXACTLY like the class inside the file.
- * 
- */
+namespace Russert;
 
-interface SourceInterface {
-	public function getSourceName();
-	public function getCargo();
-}
-
+use Russert\SourceInterface;
 
 /**
  * Source class for shared functionalities.
  */
 
-class Source {
+abstract class Source implements SourceInterface {
 	/**
 	 * Constructor.
 	 */
@@ -31,6 +24,30 @@ class Source {
 		if (empty($this->description)) {
 			die("Missing description.");
 		}
+	}
+	
+	
+	/**
+	 * Set name.
+	 *
+	 * @param string $name Source name.
+	 * @return void
+	 * @author Joonas Kokko
+	 */
+	function setName($name) {
+		$this->name = $name;
+	}
+	
+	
+	/**
+	 * Set link.
+	 *
+	 * @param string $link The link.
+	 * @return void
+	 * @author Joonas Kokko
+	 */
+	function setLink($link) {
+		$this->link = $link;
 	}
 	
 	
@@ -55,7 +72,7 @@ class Source {
 		$html = @file_get_contents($this->link);
 		
 		if ($html) {
-			$doc = new DOMDocument();
+			$doc = new \DOMDocument();
 		  $doc->strictErrorChecking = FALSE;
 		  @$doc->loadHTML($html);
 		

@@ -1,8 +1,9 @@
 <?php
 PHP_SAPI == 'cli' or die();
-require("config.php");
-require("source.php");
-require "vendor/autoload.php";
+require_once("config.php");
+
+require_once __DIR__ . "/vendor/autoload.php";
+
 new Russert();
 
 class Russert {
@@ -42,6 +43,7 @@ class Russert {
 			die();
 		}
 		
+		// Help variable for getting single source name.
 		$single_source = "";
 		
 		// Check custom command-line parameters.
@@ -64,7 +66,7 @@ class Russert {
 			}
 		}
 		
-		$sources = array();
+		$sources = [];
 		
 		// Load all available sources if the single source mode isn't on.
 		if ($single_source) {
@@ -79,6 +81,7 @@ class Russert {
 			die();
 		}
 		
+		// Handle the sources.
 		$this->handleSources($sources);
 		
 		// Output RSS files.
@@ -113,11 +116,12 @@ class Russert {
 	/**
 	 * Returns a list of sources in the folder.
 	 *
-	 * @return Mixed Array of sources or FALSE if nothing found.
+	 * @return Array Array of sources found.
 	 */
 	
-	function getSources() {
+	function getSources() : array {
 		$files = glob(SOURCE_FOLDER . "/*.php");
+		$sources = [];
 		
 		if ($files) {
 			foreach ($files as &$file) {
@@ -125,31 +129,30 @@ class Russert {
 				$file = end($file);
 				$file = explode(".php", $file);
 				$file = reset($file);
+				
+				// See if the class exists.
+				// FIXME: Get this from somewhere else?
+				$namespace = "\\Russert\\Sources\\";
+				
+				// Filename here.
+				$source = $namespace . $file;
+				
+				if (class_exists($source)) {
+					// These all must come from "Source" class.
+					$source_object = new $source;
+					
+					// FIXME: Get this from somewhere else?
+					if (is_subclass_of($source_object, "\\Russert\\Source")) {
+						$sources[] = $source;
+					}
+				}
+				else {
+					$this->log("Loading source {$source} failed.");
+				}
 			}
-
-			return $files;
 		}
 		
-		return FALSE;
-	}
-	
-	
-	/**
-	 * Load a source based on its class name.
-	 *
-	 * @return Boolean True if loading was successful, false if not.
-	 */
-	
-	function loadSource($name) {
-		$filename = SOURCE_FOLDER . "/" . $name . ".php";
-		
-		if (file_exists($filename)) {
-			require_once($filename);
-			
-			return TRUE;
-		}
-		
-		return FALSE;
+		return $sources;
 	}
 	
 	
@@ -159,24 +162,15 @@ class Russert {
 	 * @return Boolean True/false on success/fail.
 	 */
 	
-	function handleSources(array $sources) {
+	function handleSources(array $sources) : bool {
 		foreach ($sources as $source) {
-			// Take only the base name.
-			$source = explode("/", $source);
-			$class_name = end($source);
-			$class_name = explode(".php", $class_name);
-			$class_name = reset($class_name);
+			$classname = $source;
 			
-			if ($this->loadSource($class_name)) {
-				// Create the object.
-				$object = new $class_name;
-				
-				if ($this->handleCargo($object)) {
-					return TRUE;
-				}
-			}
-			else {
-				$this->log("Loading source " . $class_name . "failed.");
+			// Create the object.
+			$source = new $source;
+			
+			if ($this->handleCargo($source)) {
+				return TRUE;
 			}
 		}
 		
@@ -188,7 +182,7 @@ class Russert {
 	 * Handles individual set of cargo coming from the source.
 	 */
 	
-	function handleCargo($source) {
+	function handleCargo($source) : void {
 		try {
 			$cargo = $source->getCargo();
 		
@@ -221,23 +215,16 @@ class Russert {
 	 * @return Boolean True on success, false on fail.
 	 */
 	
-	function handleRssFiles($source_names) {
-		// Get different sources.
-		if ($source_names) {
-			foreach ($source_names as $source_name) {
-				if ($this->loadSource($source_name)) {
-					$source_object = new $source_name;
+	function handleRssFiles($sources) : bool {
+		if ($sources) {
+			foreach ($sources as $source) {
+				$source_object = new $source;
 
-					$items = $this->getLatestItemsBySourceName($source_object->name);
+				$items = $this->getLatestItemsBySourceName($source_object->name);
 
-					if ($items) {
-						$this->log("Generating RSS feed for " . $source_name);
-						$this->saveRssFile($items, $source_object);
-					}
-				}
-				else {
-					$this->log("Loading source " . $source_name . " failed.");
-					break;
+				if ($items) {
+					$this->log("Generating RSS feed for {$source_object->name}");
+					$this->saveRssFile($items, $source_object);
 				}
 			}
 		}
@@ -252,14 +239,19 @@ class Russert {
 	 * @return Boolean True on success, false on fail.
 	 */
 	
-	function saveRssFile(array $items, $source) {
+	function saveRssFile(array $items, object $source) : bool {
 		ob_start();
 		require("rss.tpl.php");
 		$html = ob_get_contents();
 		ob_end_clean();
 		
-		if (file_put_contents(RSS_FOLDER . "/" . $source->name . ".xml", $html)) {
-			return TRUE;
+		if (!DEBUG_MODE) {
+			if (file_put_contents(RSS_FOLDER . "/" . $source->name . ".xml", $html)) {
+				return TRUE;
+			}
+		}
+		else {
+			$this->log("Would save RSS file for {$source->name}.");
 		}
 		
 		return FALSE;
@@ -273,7 +265,7 @@ class Russert {
 	 * @return Boolean True if the item exists, false if it doesn't.
 	 */
 	
-	function itemExists($item) {
+	function itemExists(array $item) : bool {
 		$guid = $item['guid'];
 		
 		if ($guid) {
@@ -296,16 +288,13 @@ class Russert {
 	 * @return Mixed Item array or FALSE
 	 */
 	
-	function getItemByGuid($guid) {
+	function getItemByGuid(string $guid) : array {
+		
 		if ($this->collection && $guid) {
-			$item = $this->collection->findOne(array('guid' => $guid));
-			
-			if ($item) {
-				return $item;
-			}
+			$item = (array) $this->collection->findOne(array('guid' => $guid));
 		}
 		
-		return FALSE;
+		return $item;
 	}
 	
 	
@@ -316,24 +305,22 @@ class Russert {
 	 *
 	 * @return Mixed Array of items or false if nothing found.
 	 */
-	function getLatestItemsBySourceName($source_name, $limit = 20) {
+	function getLatestItemsBySourceName(string $source_name,  int $limit = 20) : array {
+		$items = [];
+		
 		if ($this->collection && $source_name) {
 			$cursor = $this->collection->find(array('source' => $source_name), array("sort" => array('seen' => -1), "limit" => $limit));
 			
 			if ($cursor) {
-				$items = array();
+				$items = [];
 				
 				foreach ($cursor as $item) {
 					$items[] = $item;
 				}
-				
-				if ($items) {
-					return $items;
-				}
 			}
 		}
 		
-		return FALSE;
+		return $items;
 	}
 	
 	
@@ -342,12 +329,12 @@ class Russert {
 	 * @param Array $item Item array to be saved.
 	 * @param String $source_name The source name.
 	 *
-	 * @return Mixed The item array on success or false on fail.
+	 * @return Boolean True or false on success/fail.
 	 */
 	
-	function saveItem($item, $source_name) {
+	function saveItem(array $item, string $source_name) : bool {
 		// Validate the item.
-		if ($this->isItemValid($item)) {
+		if ($this->isItemValid($item) && !DEBUG_MODE) {
 			// Set date.
 			$item['seen'] = new MongoDB\BSON\UTCDateTime(round(microtime(TRUE) * 1000));
 
@@ -355,10 +342,14 @@ class Russert {
 			$item['source'] = $source_name;
 
 			// Save.
-			if ($this->collection) {
-				$this->collection->insertOne($item);
-				return $item;
+			if ($this->collection && $this->collection->insertOne($item)) {
+				return TRUE;
 			}
+		}
+		else if (DEBUG_MODE) {
+			// Print the item to the log.
+			$this->log("Would insert: " . json_encode($item));
+			return TRUE;
 		}
 		
 		return FALSE;
@@ -372,8 +363,8 @@ class Russert {
 	 * @return Boolean True if the item is valid, false if not.
 	 */
 	
-	function isItemValid($item) {
-		$keys = array("title", "link", "guid");
+	function isItemValid(array $item) : bool {
+		$keys = [ "title", "link", "guid" ];
 		
 		foreach ($keys as $key) {
 			if (empty($item[$key])) {
@@ -391,7 +382,7 @@ class Russert {
 	 * @return Boolean Success/fail.
 	 */	
 	
-	function setLock() {
+	function setLock() : bool {
 		// Lock is disabled.
 		if (DEBUG_MODE) {
 			return TRUE;
@@ -417,7 +408,7 @@ class Russert {
 	 * @return Boolean True/false.
 	 */
 	
-	function isLocked() {
+	function isLocked() : bool {
 		// Lock is disabled.
 		if (DEBUG_MODE) {
 			return FALSE;
@@ -442,7 +433,7 @@ class Russert {
 	 * @return Boolean True/false.
 	 */
 	
-	function freeLock() {
+	function freeLock() : bool {
 		if (file_exists(LOCKFILE) && unlink(LOCKFILE)) {
 			return TRUE;
 		}
@@ -462,7 +453,7 @@ class Russert {
 	 * @return Boolean True/false.
 	 */
 	
-	function connectMongo() {
+	function connectMongo() : bool {
 		if ($this->connection = new MongoDB\Driver\Manager("mongodb://" . MONGODB_HOST)) {
 			return TRUE;
 		}
@@ -477,7 +468,7 @@ class Russert {
 	 * @return boolean True/false.
 	 * @author Joonas Kokko
 	 */
-	function ensureIndexes() {
+	function ensureIndexes() : bool {
 		if ($this->connection && $this->collection) {
 			if (!$this->collection->createIndex(array('guid' => 1))) {
 				return FALSE;
@@ -503,7 +494,7 @@ class Russert {
 	 * Handles encountered errors by printing them out and mailing them.
 	 */
 	 
-	function handleErrors() {
+	function handleErrors() : void {
 		if ($this->errors) {
 			$this->log("Encountered " . count($this->errors) . " serious errors:");
 			
@@ -522,7 +513,7 @@ class Russert {
 	 * Compile one mail from a set of errors.
 	 */
 	 
-	function sendMails(array $mails) {
+	function sendMails(array $mails) : void {
 		if ($mails && !DEBUG_MODE) {
 			$this->log("Sending " . count($mails) . " errors(s) to " . REPORT_EMAIL . ".");
 			$message = "";
@@ -533,7 +524,7 @@ class Russert {
 			
 			$user = exec("whoami");
 			$host = exec("hostname");
-			$from = $user . "@" . $host;
+			$from = "{$user}@{$host}";
 			
 			@mail(REPORT_EMAIL, "Critical Russert error(s)", $message, $from);
 		}
@@ -541,12 +532,12 @@ class Russert {
 	
 	
 	/**
-	 * A simple log function that will also log to Witness in the future.
+	 * A simple log function
 	 * @param String $message A message to be logged.
 	 * @param Boolean $bad If this is bad or not. Bad things are mailed and printed out after the script shuts down.
 	 */
 	
-	function log($message, $bad = FALSE) {
+	function log(string $message, bool $bad = FALSE) : void {
 		echo date('c') . ": " . $message . "\n";
 		
 		if ($bad) {
