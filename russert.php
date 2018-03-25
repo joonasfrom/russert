@@ -292,16 +292,22 @@ class Russert {
 	/**
 	 * Returns an item from MongoDB by GUID.
 	 *
-	 * @return Mixed Item array or FALSE
+	 * @return Object Item Object.
 	 */
 	
-	function getItemByGuid(string $guid) : array {
+	function getItemByGuid(string $guid) : object {
+		// FIXME: ":D"
+		$item = (object) [];
 		
 		if ($this->collection && $guid) {
-			$item = (array) $this->collection->findOne(array('guid' => $guid));
+			$item = $this->collection->findOne(array('guid' => $guid));
+			
+			if ($item) {
+				return $item;
+			}
 		}
 		
-		return $item;
+		return (object) []; // ":D" FIXME
 	}
 	
 	
@@ -312,7 +318,7 @@ class Russert {
 	 *
 	 * @return Mixed Array of items or false if nothing found.
 	 */
-	function getLatestItemsBySourceName(string $source_name,  int $limit = 20) : array {
+	function getLatestItemsBySourceName(string $source_name, int $limit = 20) : array {
 		$items = [];
 		
 		if ($this->collection && $source_name) {
