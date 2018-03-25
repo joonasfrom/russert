@@ -70,7 +70,7 @@ class Russert {
 		
 		// Load all available sources if the single source mode isn't on.
 		if ($single_source) {
-			$sources[] = $single_source;
+			$sources = $this->getSources($single_source);
 		}
 		else {
 			$sources = $this->getSources();
@@ -115,12 +115,19 @@ class Russert {
 	
 	/**
 	 * Returns a list of sources in the folder.
+	 * @param String $name A name filter for the query.
 	 *
 	 * @return Array Array of sources found.
 	 */
 	
-	function getSources() : array {
-		$files = glob(SOURCE_FOLDER . "/*.php");
+	function getSources(string $name = "") : array {
+		$file_query = SOURCE_FOLDER . "/*.php";
+		
+		if (!empty($name)) {
+			$file_query = SOURCE_FOLDER . "/{$name}.php";
+		}
+		
+		$files = glob($file_query);
 		$sources = [];
 		
 		if ($files) {
