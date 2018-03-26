@@ -276,9 +276,10 @@ class Russert {
 		$guid = $item['guid'];
 		
 		if ($guid) {
-			$existing = $this->getItemByGuid($guid);
+			// FIXME
+			$existing = (array) $this->getItemByGuid($guid);
 			
-			if ($existing) {
+			if (!empty($existing)) {
 				return TRUE;
 			}
 		}
