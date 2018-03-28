@@ -197,17 +197,17 @@ class Russert {
 				foreach ($cargo as $item) {
 					// Try getting the same item from the database.
 					if ($this->itemExists($item)) {
-						$this->log("Item " . $item['guid'] . " from source " . $source->getSourceName() . " already exists, skipping.");
+						$this->log("Item " . $item['guid'] . " from source " . $source->getName() . " already exists, skipping.");
 					}
 					else {
 						// Insert the item.
-						$this->log("Item " . $item['guid'] . " found from source " . $source->getSourceName() . ", saving.");
-						$this->saveItem($item, $source->getSourceName());
+						$this->log("Item " . $item['guid'] . " found from source " . $source->getName() . ", saving.");
+						$this->saveItem($item, $source);
 					}
 				}
 			}
 			else {
-				$this->log("Couldn't get any items from " . $source->getSourceName());
+				$this->log("Couldn't get any items from " . $source->getName());
 			}
 		}
 		catch (Exception $e) {
@@ -227,10 +227,10 @@ class Russert {
 			foreach ($sources as $source) {
 				$source_object = new $source;
 
-				$items = $this->getLatestItemsBySourceName($source_object->name);
+				$items = $this->getLatestItemsBySource($source_object);
 
 				if ($items) {
-					$this->log("Generating RSS feed for {$source_object->name}");
+					$this->log("Generating RSS feed for {$source_object->getName()}");
 					$this->saveRssFile($items, $source_object);
 				}
 			}
@@ -252,13 +252,15 @@ class Russert {
 		$html = ob_get_contents();
 		ob_end_clean();
 		
+		$filename = RSS_FOLDER . "/" . $source->getClassName() . ".xml";
+		
 		if (!DEBUG_MODE) {
-			if (file_put_contents(RSS_FOLDER . "/" . $source->name . ".xml", $html)) {
+			if (file_put_contents($filename, $html)) {
 				return TRUE;
 			}
 		}
 		else {
-			$this->log("Would save RSS file for {$source->name}.");
+			$this->log("Would save RSS file to {$filename}.");
 		}
 		
 		return FALSE;
@@ -314,16 +316,16 @@ class Russert {
 	
 	/**
 	 * Returns an array of latest items by source.
-	 * @param String $source_name Name of the source.
+	 * @param Object $source Source object..
 	 * @param Integer $limit How many to return at most.
 	 *
 	 * @return Mixed Array of items or false if nothing found.
 	 */
-	function getLatestItemsBySourceName(string $source_name, int $limit = 20) : array {
+	function getLatestItemsBySource(object $source, int $limit = 20) : array {
 		$items = [];
 		
-		if ($this->collection && $source_name) {
-			$cursor = $this->collection->find(array('source' => $source_name), array("sort" => array('seen' => -1), "limit" => $limit));
+		if ($this->collection && $source) {
+			$cursor = $this->collection->find(array('source' => $source->getClassName()), array("sort" => array('seen' => -1), "limit" => $limit));
 			
 			if ($cursor) {
 				$items = [];
@@ -341,19 +343,19 @@ class Russert {
 	/**
 	 * Save item.
 	 * @param Array $item Item array to be saved.
-	 * @param String $source_name The source name.
+	 * @param Object $source The source object.
 	 *
 	 * @return Boolean True or false on success/fail.
 	 */
 	
-	function saveItem(array $item, string $source_name) : bool {
+	function saveItem(array $item, object $source_object) : bool {
 		// Validate the item.
 		if ($this->isItemValid($item) && !DEBUG_MODE) {
 			// Set date.
 			$item['seen'] = new MongoDB\BSON\UTCDateTime(round(microtime(TRUE) * 1000));
 
 			// Add source.
-			$item['source'] = $source_name;
+			$item['source'] = $source_object->getClassName();
 
 			// Save.
 			if ($this->collection && $this->collection->insertOne($item)) {

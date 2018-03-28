@@ -8,22 +8,26 @@ use Russert\SourceInterface;
  */
 
 abstract class Source implements SourceInterface {
+	protected $name = "";
+	protected $link = "";
+	protected $description = "";
+	protected $items = [];
+
 	/**
 	 * Constructor.
 	 */
-	
 	function __construct() {
-		if (empty($this->name)) {
-			die("Missing name.");
-		}
-		
-		if (empty($this->link)) {
-			die("Missing link.");
-		}
-		
-		if (empty($this->description)) {
-			die("Missing description.");
-		}
+		// ":D"
+	}
+	
+	
+	/**
+	 * Get the name of the source. This is in pretty format
+	 * @return String The pretty name of the source.
+	 * @author Joonas Kokko
+	 */
+	public function getName() {
+		return $this->name;
 	}
 	
 	
@@ -34,8 +38,32 @@ abstract class Source implements SourceInterface {
 	 * @return void
 	 * @author Joonas Kokko
 	 */
-	function setName($name) {
+	public function setName($name) {
 		$this->name = $name;
+	}
+	
+	
+	/**
+	 * Return the class name of the object. This is only for convenience because we also need to strip the namespace away.
+	 *
+	 * @return String Name of the class.
+	 * @author Joonas Kokko
+	 */
+	public function getClassName() {
+		// https://coderwall.com/p/cpxxxw/php-get-class-name-without-namespace
+		$name = (new \ReflectionClass($this))->getShortName();
+		return $name;
+	}
+	
+	
+	/**
+	 * Get link.
+	 *
+	 * @return String The link.
+	 * @author Joonas Kokko
+	 */
+	public function getLink() {
+		return $this->link;
 	}
 	
 	
@@ -46,19 +74,19 @@ abstract class Source implements SourceInterface {
 	 * @return void
 	 * @author Joonas Kokko
 	 */
-	function setLink($link) {
+	public function setLink($link) {
 		$this->link = $link;
 	}
 	
 	
 	/**
-	 * Return the source name.
+	 * Get description
 	 *
-	 * @return String The source name.
+	 * @return String Description of the source.
+	 * @author Joonas Kokko
 	 */
-	
-	public function getSourceName() {
-		return $this->name;
+	public function getDescription() {
+		return $this->description;
 	}
 	
 	
@@ -69,7 +97,7 @@ abstract class Source implements SourceInterface {
 	 */
 	
 	public function getHtmlDom() {
-		$html = @file_get_contents($this->link);
+		$html = @file_get_contents($this->getLink());
 		
 		if ($html) {
 			$doc = new \DOMDocument();

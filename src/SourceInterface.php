@@ -7,6 +7,8 @@ namespace Russert;
  */
 
 interface SourceInterface {
-	public function getSourceName();
+	public function getName();
+	public function getClassName();
 	public function getCargo();
+	public function getDescription();
 }
