@@ -221,6 +221,9 @@ class Russert {
 						// Insert the item.
 						$this->log("Item " . $item['guid'] . " found from source " . $source->getName() . ", saving.");
 						$this->saveItem($item, $source);
+						
+						// Tell the source that it got updated so we'll re-generate RSS for it.
+						$source->setUpdated(TRUE);
 					}
 				}
 			}
@@ -249,13 +252,18 @@ class Russert {
 				}
 			});
 			
-			foreach ($updated_sources as $source) {
-				$items = $this->getLatestItemsBySource($source);
+			if (!empty($updated_sources)) {
+				foreach ($updated_sources as $source) {
+					$items = $this->getLatestItemsBySource($source);
 
-				if ($items) {
-					$this->log("Generating RSS feed for {$source->getName()}");
-					$this->saveRssFile($items, $source_object);
+					if ($items) {
+						$this->log("Generating RSS feed for {$source->getName()}");
+						$this->saveRssFile($items, $source_object);
+					}
 				}
+			}
+			else {
+				$this->log("No updates to RSS files.");
 			}
 		}
 		
