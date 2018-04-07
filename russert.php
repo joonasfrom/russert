@@ -7,6 +7,7 @@ require_once __DIR__ . "/vendor/autoload.php";
 new Russert();
 
 class Russert {
+	private $sources;
 	private $connection;
 	private $collection;
 	private $errors;
@@ -70,10 +71,10 @@ class Russert {
 		
 		// Load all available sources if the single source mode isn't on.
 		if ($single_source) {
-			$sources = $this->getSources($single_source);
+			$sources = $this->getSourceFilenames($single_source);
 		}
 		else {
-			$sources = $this->getSources();
+			$sources = $this->getSourceFilenames();
 		}
 		
 		if (!$sources) {
@@ -81,11 +82,17 @@ class Russert {
 			die();
 		}
 		
-		// Handle the sources.
-		$this->handleSources($sources);
+		// Load the source objects to $this->sources.
+		$this->loadSources($sources);
+		
+		// Handle the sources and get updates.
+		$this->handleSources();
 		
 		// Output RSS files.
-		$this->handleRssFiles($sources);
+		$this->handleRssFiles();
+		
+		// Generate HTML index file but only if not running single source mode.
+		$this->handleIndex();
 	}
 	
 	
@@ -114,13 +121,13 @@ class Russert {
 	
 	
 	/**
-	 * Returns a list of sources in the folder.
+	 * Returns a list of source filenames in the folder.
 	 * @param String $name A name filter for the query.
 	 *
 	 * @return Array Array of sources found.
 	 */
 	
-	function getSources(string $name = "") : array {
+	function getSourceFilenames(string $name = "") : array {
 		$file_query = SOURCE_FOLDER . "/*.php";
 		
 		if (!empty($name)) {
@@ -164,21 +171,28 @@ class Russert {
 	
 	
 	/**
+	 * Loads the sources into memory.
+	 *
+	 * @param array $sources Flat list of source names to load. This is because of single source support.
+	 * @return void
+	 * @author Joonas Kokko
+	 */
+	function loadSources(array $sources) {
+		foreach ($sources as $source) {
+			$this->sources[] = new $source;
+		}
+	}
+	
+	
+	/**
 	 * Handles all sources.
 	 *
 	 * @return Boolean True/false on success/fail.
 	 */
 	
-	function handleSources(array $sources) : bool {
-		foreach ($sources as $source) {
-			$classname = $source;
-			
-			// Create the object.
-			$source = new $source;
-			
-			if ($this->handleCargo($source)) {
-				return TRUE;
-			}
+	function handleSources() : bool {
+		foreach ($this->sources as $source) {
+			$this->handleCargo($source);
 		}
 		
 		return FALSE;
@@ -189,9 +203,13 @@ class Russert {
 	 * Handles individual set of cargo coming from the source.
 	 */
 	
-	function handleCargo($source) : void {
+	function handleCargo(object $source) : void {
 		try {
 			$cargo = $source->getCargo();
+			
+			if (DEBUG_MODE) {
+				print_r($cargo);
+			}
 		
 			if ($cargo) {
 				foreach ($cargo as $item) {
@@ -222,15 +240,20 @@ class Russert {
 	 * @return Boolean True on success, false on fail.
 	 */
 	
-	function handleRssFiles($sources) : bool {
-		if ($sources) {
-			foreach ($sources as $source) {
-				$source_object = new $source;
-
-				$items = $this->getLatestItemsBySource($source_object);
+	function handleRssFiles() : bool {
+		if ($this->sources) {
+			// Get sources that were updated.
+			$updated_sources = array_filter($this->sources, function($o) {
+				if ($o->getUpdated()) {
+					return TRUE;
+				}
+			});
+			
+			foreach ($updated_sources as $source) {
+				$items = $this->getLatestItemsBySource($source);
 
 				if ($items) {
-					$this->log("Generating RSS feed for {$source_object->getName()}");
+					$this->log("Generating RSS feed for {$source->getName()}");
 					$this->saveRssFile($items, $source_object);
 				}
 			}
@@ -264,6 +287,64 @@ class Russert {
 		}
 		
 		return FALSE;
+	}
+	
+	
+	/**
+	 * Saves index.html into the RSS folder.
+	 *
+	 * @return void
+	 * @author Joonas Kokko
+	 */
+	function handleIndex() {
+		// FIXME: Do this in more clever way.
+		if (count($this->sources) == 1) {
+			$this->log("Skipping index generation due to source mode.");
+			return TRUE;
+		}
+		
+		$this->log("Generating index file.");
+		$source_filenames = [];
+		
+		$visible_sources = array_filter($this->sources, function($o) {
+			if ($o->getHidden() == FALSE) {
+				return TRUE;
+			}
+		});
+		
+		// Get filenames
+		if (!empty($visible_sources)) {
+			foreach ($visible_sources as $source) {
+				$source_filenames[] = $source->getClassName() . ".xml";
+			}
+			
+			$this->saveIndexFile($source_filenames);
+			$this->log("Index file updated.");
+		}
+		else {
+			$this->log("No visible souces.");
+		}
+	}
+	
+	
+	function saveIndexFile(array $source_filenames) : bool {
+		ob_start();
+		require("index.tpl.php");
+		$html = ob_get_contents();
+		ob_end_clean();
+		
+		$filename = RSS_FOLDER . "/" . "index.html";
+		
+		if (!DEBUG_MODE) {
+			if (file_put_contents($filename, $html)) {
+				return TRUE;
+			}
+		}
+		else {
+			$this->log("Would save index file to {$filename}.");
+		}
+		
+		return TRUE;
 	}
 	
 	
