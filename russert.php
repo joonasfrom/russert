@@ -13,6 +13,10 @@ class Russert {
 	private $errors;
 	private $locked;
 	
+	// "Force" flags.
+	private $generate_rss = FALSE;
+	private $generate_html = TRUE;
+	
 	function __construct() {
 		// Set start time.
 		$this->start_time = microtime(TRUE);
@@ -53,14 +57,23 @@ class Russert {
 			unset($_SERVER['argv'][0]);
 			
 			foreach ($_SERVER['argv'] as $argument) {
-				
 				if (strpos($argument, "--source=") !== FALSE) {
 					$single_source = explode("--source=", $argument)[1];
+					
+					// Skipt index generation.
+					$this->generate_html = FALSE;
+					continue;
+				}
+				else if ($argument == "--force-rss") {
+					$this->log("Forcing RSS generation.");
+					$this->generate_rss = TRUE;
+					continue;
 				}
 				elseif ($argument == "--help" || $argument == "-h") {
 					echo "Russert RSS file generator\n";
 					echo "Usage: php russert.php [OPTIONS]\n";
 					echo "    --source=SOURCE NAME   Only process a single source.\n";
+					echo "    --force-rss            Forces regeneration of RSS files.\n";
 					echo "-h, --help                 Display this message\n";
 					die();
 				}
@@ -191,7 +204,7 @@ class Russert {
 	 */
 	
 	function handleSources() : bool {
-		foreach ($this->sources as $source) {
+		foreach ($this->sources as &$source) {
 			$this->handleCargo($source);
 		}
 		
@@ -204,6 +217,7 @@ class Russert {
 	 */
 	
 	function handleCargo(object $source) : void {
+		$this->log("Checking new items for {$source->getName()}...");
 		try {
 			$cargo = $source->getCargo();
 			
@@ -215,7 +229,9 @@ class Russert {
 				foreach ($cargo as $item) {
 					// Try getting the same item from the database.
 					if ($this->itemExists($item)) {
-						$this->log("Item " . $item['guid'] . " from source " . $source->getName() . " already exists, skipping.");
+						if (DEBUG_MODE) {
+							$this->log("Item " . $item['guid'] . " from source " . $source->getName() . " already exists, skipping.");
+						}
 					}
 					else {
 						// Insert the item.
@@ -246,19 +262,24 @@ class Russert {
 	function handleRssFiles() : bool {
 		if ($this->sources) {
 			// Get sources that were updated.
-			$updated_sources = array_filter($this->sources, function($o) {
-				if ($o->getUpdated()) {
-					return TRUE;
-				}
-			});
+			if (!$this->generate_rss) {
+				$sources = array_filter($this->sources, function($o) {
+					if ($o->getUpdated()) {
+						return TRUE;
+					}
+				});
+			}
+			else {
+				$sources = $this->sources;
+			}
 			
-			if (!empty($updated_sources)) {
-				foreach ($updated_sources as $source) {
+			if (!empty($sources)) {
+				foreach ($sources as $source) {
 					$items = $this->getLatestItemsBySource($source);
 
 					if ($items) {
 						$this->log("Generating RSS feed for {$source->getName()}");
-						$this->saveRssFile($items, $source_object);
+						$this->saveRssFile($items, $source);
 					}
 				}
 			}
@@ -287,6 +308,7 @@ class Russert {
 		
 		if (!DEBUG_MODE) {
 			if (file_put_contents($filename, $html)) {
+				$this->log("RSS file saved.");
 				return TRUE;
 			}
 		}
@@ -305,9 +327,8 @@ class Russert {
 	 * @author Joonas Kokko
 	 */
 	function handleIndex() {
-		// FIXME: Do this in more clever way.
-		if (count($this->sources) == 1) {
-			$this->log("Skipping index generation due to source mode.");
+		if (!$this->generate_html) {
+			$this->log("Skipping index generation due to single source mode.");
 			return TRUE;
 		}
 		
