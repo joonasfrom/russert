@@ -26,86 +26,82 @@ class Russert {
 			$this->log("Lock is in place.");
 			die();
 		}
+		
+		try {
+			// Set lock.
+			$this->setLock();
 
-		// Set lock.
-		$this->setLock();
-
-		// Connect to MongoDB.
-		if (!$this->connectMongo()) {
-			$this->log("Couldn't connect to MongoDB.");
-			die();
-		}
+			// Connect to MongoDB.
+			$this->connectMongo();
 		
-		// Set collection.
-		if (!$this->collection = new MongoDB\Collection($this->connection, "russert", "item")) {
-			$this->log("Collection setting failed.");
-			die();
-		}
+			// Set collection.
+			$this->collection = new MongoDB\Collection($this->connection, "russert", "item");
 		
-		// Set some indexes.
-		if (!$this->ensureIndexes()) {
-			$this->log("Couldn't create indexes to MongoDB.");
-			die();
-		}
+			// Set some indexes.
+			$this->ensureIndexes();
 		
-		// Help variable for getting single source name.
-		$single_source = "";
+			// Help variable for getting single source name.
+			$single_source = NULL;
 		
-		// Check custom command-line parameters.
-		if (!empty($_SERVER['argv']) && is_array($_SERVER) && count($_SERVER['argv']) > 1) {
-			// Unset the first since it's the script name.
-			unset($_SERVER['argv'][0]);
+			// Check custom command-line parameters.
+			if (!empty($_SERVER['argv']) && is_array($_SERVER) && count($_SERVER['argv']) > 1) {
+				// Unset the first since it's the script name.
+				unset($_SERVER['argv'][0]);
 			
-			foreach ($_SERVER['argv'] as $argument) {
-				if (strpos($argument, "--source=") !== FALSE) {
-					$single_source = explode("--source=", $argument)[1];
+				foreach ($_SERVER['argv'] as $argument) {
+					if (strpos($argument, "--source=") !== FALSE) {
+						$single_source = explode("--source=", $argument)[1];
 					
-					// Skipt index generation.
-					$this->generate_html = FALSE;
-					continue;
-				}
-				else if ($argument == "--force-rss") {
-					$this->log("Forcing RSS generation.");
-					$this->generate_rss = TRUE;
-					continue;
-				}
-				elseif ($argument == "--help" || $argument == "-h") {
-					echo "Russert RSS file generator\n";
-					echo "Usage: php russert.php [OPTIONS]\n";
-					echo "    --source=SOURCE NAME   Only process a single source.\n";
-					echo "    --force-rss            Forces regeneration of RSS files.\n";
-					echo "-h, --help                 Display this message\n";
-					die();
+						// Skipt index generation.
+						$this->generate_html = FALSE;
+						continue;
+					}
+					else if ($argument == "--force-rss") {
+						$this->log("Forcing RSS generation.");
+						$this->generate_rss = TRUE;
+						continue;
+					}
+					elseif ($argument == "--help" || $argument == "-h") {
+						echo "Russert RSS file generator\n";
+						echo "Usage: php russert.php [OPTIONS]\n";
+						echo "    --source=SOURCE NAME   Only process a single source.\n";
+						echo "    --force-rss            Forces regeneration of RSS files.\n";
+						echo "-h, --help                 Display this message\n";
+						die();
+					}
 				}
 			}
+		
+			$sources = [];
+		
+			// Load all available sources if the single source mode isn't on.
+			if ($single_source) {
+				$sources = $this->getSourceFilenames($single_source);
+			}
+			else {
+				$sources = $this->getSourceFilenames();
+			}
+		
+			if (!$sources) {
+				$this->log("No sources found.");
+				die();
+			}
+		
+			// Load the source objects to $this->sources.
+			$this->loadSources($sources);
+		
+			// Handle the sources and get updates.
+			$this->handleSources();
+		
+			// Output RSS files.
+			$this->handleRssFiles();
+		
+			// Generate HTML index file but only if not running single source mode.
+			$this->handleIndex();
 		}
-		
-		$sources = [];
-		
-		// Load all available sources if the single source mode isn't on.
-		if ($single_source) {
-			$sources = $this->getSourceFilenames($single_source);
+		catch (Exception $e) {
+			$this->log("Things went wrong: {$e->getMessage}.", TRUE);
 		}
-		else {
-			$sources = $this->getSourceFilenames();
-		}
-		
-		if (!$sources) {
-			$this->log("No sources found.");
-			die();
-		}
-		
-		// Load the source objects to $this->sources.
-		$this->loadSources($sources);
-		
-		// Handle the sources and get updates.
-		$this->handleSources();
-		
-		// Output RSS files.
-		$this->handleRssFiles();
-		
-		// Generate HTML index file but only if not running single source mode.
-		$this->handleIndex();
 	}
 	
 	
@@ -225,17 +221,15 @@ class Russert {
 				print_r($cargo);
 			}
 		
-			if ($cargo) {
+			if (!empty($cargo)) {
 				foreach ($cargo as $item) {
 					// Try getting the same item from the database.
 					if ($this->itemExists($item)) {
-						if (DEBUG_MODE) {
-							$this->log("Item " . $item['guid'] . " from source " . $source->getName() . " already exists, skipping.");
-						}
+							$this->log("Item already exists, skipping: {$item['guid']}");
 					}
 					else {
 						// Insert the item.
-						$this->log("Item " . $item['guid'] . " found from source " . $source->getName() . ", saving.");
+						$this->log("Item found, saving: {$item['guid']}");
 						$this->saveItem($item, $source);
 						
 						// Tell the source that it got updated so we'll re-generate RSS for it.
@@ -244,11 +238,11 @@ class Russert {
 				}
 			}
 			else {
-				$this->log("Couldn't get any items from " . $source->getName());
+				$this->log("Couldn't get any items from {$source->getName()}", TRUE);
 			}
 		}
 		catch (Exception $e) {
-			$this->log("Something went horribly wrong while trying to get cargo from source.");
+			$this->log("Couldn't handle cargo: {$e->getMessage}.");
 		}
 	}
 	
@@ -276,7 +270,7 @@ class Russert {
 			if (!empty($sources)) {
 				foreach ($sources as $source) {
 					$items = $this->getLatestItemsBySource($source);
-
+					
 					if ($items) {
 						$this->log("Generating RSS feed for {$source->getName()}");
 						$this->saveRssFile($items, $source);
@@ -343,11 +337,7 @@ class Russert {
 		
 		// Get filenames
 		if (!empty($visible_sources)) {
-			foreach ($visible_sources as $source) {
-				$source_filenames[] = $source->getClassName() . ".xml";
-			}
-			
-			$this->saveIndexFile($source_filenames);
+			$this->saveIndexFile($visible_sources);
 			$this->log("Index file updated.");
 		}
 		else {
@@ -356,7 +346,7 @@ class Russert {
 	}
 	
 	
-	function saveIndexFile(array $source_filenames) : bool {
+	function saveIndexFile(array $sources) : bool {
 		ob_start();
 		require("index.tpl.php");
 		$html = ob_get_contents();
@@ -385,21 +375,21 @@ class Russert {
 	 */
 	
 	function itemExists(array $item) : bool {
+		if (empty($item['guid'])) {
+			throw new Exception("Missing guid.");
+		}
+		
 		$guid = $item['guid'];
+		$existing_item = NULL;
 		
-		if ($guid) {
-			// FIXME
-			$existing = (array) $this->getItemByGuid($guid);
-			
-			if (!empty($existing)) {
-				return TRUE;
-			}
+		try {
+			$existing_item = $this->getItemByGuid($guid);
 		}
-		else {
-			$this->log("No GUID found for " . $item['title']);
+		catch (Exception $e) {
+			return FALSE;
 		}
 		
-		return FALSE;
+		return TRUE;
 	}
 	
 	/**
@@ -408,19 +398,19 @@ class Russert {
 	 * @return Object Item Object.
 	 */
 	
-	function getItemByGuid(string $guid) : object {
-		// FIXME: ":D"
-		$item = (object) [];
-		
-		if ($this->collection && $guid) {
-			$item = $this->collection->findOne(array('guid' => $guid));
-			
-			if ($item) {
-				return $item;
-			}
+	function getItemByGuid(string $guid) : MongoDB\Model\BSONDocument {
+		if (empty($guid)) {
+			throw new Exception("Invalid guid.");
 		}
 		
-		return (object) []; // ":D" FIXME
+		$item = $this->collection->findOne(array('guid' => $guid));
+		
+		if (!empty($item)) {
+			return $item;
+		}
+		else {
+			throw new Exception("No item found.");
+		}
 	}
 	
 	
@@ -433,17 +423,23 @@ class Russert {
 	 */
 	function getLatestItemsBySource(object $source, int $limit = 20) : array {
 		$items = [];
-		
-		if ($this->collection && $source) {
-			$cursor = $this->collection->find(array('source' => $source->getClassName()), array("sort" => array('seen' => -1), "limit" => $limit));
+
+		try {
+			$cursor = $this->collection->find(
+				[ "source" => $source->getClassName() ],
+				[ "sort" => [ "seen" => -1 ], "limit" => $limit ]
+			);
 			
-			if ($cursor) {
-				$items = [];
-				
-				foreach ($cursor as $item) {
-					$items[] = $item;
-				}
+			foreach ($cursor as $item) {
+				$items[] = $item;
 			}
+			
+			if (empty($items)) {
+				throw new Exception("No latest items found.");
+			}
+		}
+		catch (Exception $e) {
+			throw new Exception("Getting latest items from source failed: {$e->getMessage()}.");
 		}
 		
 		return $items;
@@ -458,27 +454,32 @@ class Russert {
 	 * @return Boolean True or false on success/fail.
 	 */
 	
-	function saveItem(array $item, object $source_object) : bool {
+	function saveItem(array $item, object $source) : void {
 		// Validate the item.
-		if ($this->isItemValid($item) && !DEBUG_MODE) {
-			// Set date.
-			$item['seen'] = new MongoDB\BSON\UTCDateTime(round(microtime(TRUE) * 1000));
-
-			// Add source.
-			$item['source'] = $source_object->getClassName();
-
-			// Save.
-			if ($this->collection && $this->collection->insertOne($item)) {
-				return TRUE;
-			}
+		if (!$this->isItemValid($item)) {
+			throw new Exception("Item is not valid.");
 		}
-		else if (DEBUG_MODE) {
+	
+		// Set date.
+		$item['seen'] = new MongoDB\BSON\UTCDateTime(round(microtime(TRUE) * 1000));
+
+		// Add source.
+		$item['source'] = $source->getClassName();
+
+		// Debug saving..
+		if (DEBUG_MODE) {
 			// Print the item to the log.
 			$this->log("Would insert: " . json_encode($item));
-			return TRUE;
+			return;
 		}
 		
-		return FALSE;
+		// Actual save.
+		try {
+			$result = $this->collection->insertOne($item);
+		}
+		catch (Exception $e) {
+			throw new Exception("Inserting item to database failed: {$e->getMessage()}.");
+		}
 	}
 	
 	
@@ -494,6 +495,7 @@ class Russert {
 		
 		foreach ($keys as $key) {
 			if (empty($item[$key])) {
+				$this->log("Item is not valid: Missing key {$key}.");
 				return FALSE;
 			}
 		}
@@ -508,23 +510,20 @@ class Russert {
 	 * @return Boolean Success/fail.
 	 */	
 	
-	function setLock() : bool {
+	function setLock() : void {
 		// Lock is disabled.
 		if (DEBUG_MODE) {
-			return TRUE;
+			return;
 		}
 
-		if (file_put_contents(LOCKFILE, "Locked as of " . date('c'))) {
-			// This will tell the program that the lock has been set within this run.
-			$this->locked = TRUE;
-			
-			return TRUE;
+		$result = file_put_contents(LOCKFILE, "Locked as of " . date('c'));
+		
+		if (!$result) {
+			throw new Exception("Error writing lockfile.");
 		}
-		else {
-			$this->log("Couldn't create lockfile.");
-			
-			return FALSE;
-		}
+		
+		// This will tell the program that the lock has been set within this run.
+		$this->locked = TRUE;
 	}
 	
 	
@@ -554,18 +553,19 @@ class Russert {
 	
 	
 	/**
-	 * Free the lock.
+	 * Free the lockfile.
 	 *
-	 * @return Boolean True/false.
+	 * @return void
+	 * @author Joonas Kokko
 	 */
 	
-	function freeLock() : bool {
-		if (file_exists(LOCKFILE) && unlink(LOCKFILE)) {
-			return TRUE;
+	function freeLock() : void {
+		if (!file_exists(LOCKFILE)) {
+			throw new Exception("File doesn't exist.");
 		}
-		else {
-			$this->log("Couldn't remove lockfile. Might be due to the fact that it doesn't exist");
-			return FALSE;
+		
+		if (!unlink(LOCKFILE)) {
+			throw new Exception("Removing lockfile failed.");
 		}
 	}
 	
@@ -575,16 +575,15 @@ class Russert {
 	
 	/**
 	 * Connects to MongoDB and sets $this->connection.
-	 *
-	 * @return Boolean True/false.
 	 */
 	
-	function connectMongo() : bool {
-		if ($this->connection = new MongoDB\Driver\Manager("mongodb://" . MONGODB_HOST)) {
-			return TRUE;
+	function connectMongo() : void {
+		try {
+			$this->connection = new MongoDB\Driver\Manager("mongodb://" . MONGODB_HOST);
 		}
-		
-		return FALSE;
+		catch (Exception $e) {
+			throw new Exception("Connecting to MongoDB failed: {$e->getMessage()}.");
+		}
 	}
 	
 	
@@ -594,25 +593,15 @@ class Russert {
 	 * @return boolean True/false.
 	 * @author Joonas Kokko
 	 */
-	function ensureIndexes() : bool {
-		if ($this->connection && $this->collection) {
-			if (!$this->collection->createIndex(array('guid' => 1))) {
-				return FALSE;
-			}
-			
-			if (!$this->collection->createIndex(array('source' => 1))) {
-				return FALSE;
-			}
-			
-			if (!$this->collection->createIndex(array('seen' => -1))) {
-				return FALSE;
-			}
-			
-			return TRUE;
+	function ensureIndexes() : void {
+		try {
+			$this->collection->createIndex(array('guid' => 1));
+			$this->collection->createIndex(array('source' => 1));
+			$this->collection->createIndex(array('seen' => -1));
 		}
-		
-		// Argh.
-		return FALSE;
+		catch (Exception $e) {
+			$this->log("Creating indexes failed: {$e->getMessage()}.");
+		}
 	}
 
 
@@ -648,11 +637,11 @@ class Russert {
 				$message .= $mail . "\n";
 			}
 			
-			$user = exec("whoami");
-			$host = exec("hostname");
-			$from = "{$user}@{$host}";
+			$result = mail(REPORT_EMAIL, "Critical Russert error(s)", $message);
 			
-			@mail(REPORT_EMAIL, "Critical Russert error(s)", $message, $from);
+			if (!$result) {
+				throw new Exception("Sending mail failed due to unknown error.");
+			}
 		}
 	}
 	
@@ -660,15 +649,20 @@ class Russert {
 	/**
 	 * A simple log function
 	 * @param String $message A message to be logged.
-	 * @param Boolean $bad If this is bad or not. Bad things are mailed and printed out after the script shuts down.
+	 * @param Boolean $error If the thing is an error and should be notified via email.
 	 */
 	
-	function log(string $message, bool $bad = FALSE) : void {
-		echo date('c') . ": " . $message . "\n";
+	function log(string $message, bool $error = FALSE) : void {
+		// Timestamp.
+		echo terminal_style(date('c') . ": ", "info");
 		
-		if ($bad) {
+		if ($error) {
+			echo terminal_style($message, "red") . "\n";
 			// Add the message to errors.
 			$this->errors[] = $message;
+		}
+		else {
+			echo terminal_style($message, "green") . "\n";
 		}
 	}	
 }
