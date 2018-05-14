@@ -150,6 +150,9 @@ abstract class Source implements SourceInterface {
 				return $doc;
 			}
 		}
+		else {
+			throw new \Exception("Couldn't get HTML.");
+		}
 		
 		return FALSE;
 	}

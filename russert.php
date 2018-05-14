@@ -7,11 +7,11 @@ require_once __DIR__ . "/vendor/autoload.php";
 new Russert();
 
 class Russert {
-	private $sources;
-	private $connection;
-	private $collection;
-	private $errors;
-	private $locked;
+	private $sources = [];
+	private $connection = NULL;
+	private $collection = NULL;
+	private $errors = [];
+	private $locked = FALSE;
 	
 	// "Force" flags.
 	private $generate_rss = FALSE;
@@ -44,7 +44,7 @@ class Russert {
 			$single_source = NULL;
 		
 			// Check custom command-line parameters.
-			if (!empty($_SERVER['argv']) && is_array($_SERVER) && count($_SERVER['argv']) > 1) {
+			if (!empty($_SERVER['argv']) && is_array($_SERVER['argv']) && count($_SERVER['argv']) > 1) {
 				// Unset the first since it's the script name.
 				unset($_SERVER['argv'][0]);
 			
@@ -238,7 +238,7 @@ class Russert {
 				}
 			}
 			else {
-				$this->log("Couldn't get any items from {$source->getName()}", TRUE);
+				$this->log("Couldn't get any items from {$source->getName()}, DOM changed?", TRUE);
 			}
 		}
 		catch (Exception $e) {
@@ -376,7 +376,7 @@ class Russert {
 	
 	function itemExists(array $item) : bool {
 		if (empty($item['guid'])) {
-			throw new Exception("Missing guid.");
+			throw new \Exception("Missing guid.");
 		}
 		
 		$guid = $item['guid'];
@@ -400,7 +400,7 @@ class Russert {
 	
 	function getItemByGuid(string $guid) : MongoDB\Model\BSONDocument {
 		if (empty($guid)) {
-			throw new Exception("Invalid guid.");
+			throw new \Exception("Invalid guid.");
 		}
 		
 		$item = $this->collection->findOne(array('guid' => $guid));
@@ -409,7 +409,7 @@ class Russert {
 			return $item;
 		}
 		else {
-			throw new Exception("No item found.");
+			throw new \Exception("No item found.");
 		}
 	}
 	
@@ -435,11 +435,11 @@ class Russert {
 			}
 			
 			if (empty($items)) {
-				throw new Exception("No latest items found.");
+				throw new \Exception("No latest items found.");
 			}
 		}
 		catch (Exception $e) {
-			throw new Exception("Getting latest items from source failed: {$e->getMessage()}.");
+			throw new \Exception("Getting latest items from source failed: {$e->getMessage()}.");
 		}
 		
 		return $items;
@@ -457,7 +457,7 @@ class Russert {
 	function saveItem(array $item, object $source) : void {
 		// Validate the item.
 		if (!$this->isItemValid($item)) {
-			throw new Exception("Item is not valid.");
+			throw new \Exception("Item is not valid.");
 		}
 	
 		// Set date.
@@ -478,7 +478,7 @@ class Russert {
 			$result = $this->collection->insertOne($item);
 		}
 		catch (Exception $e) {
-			throw new Exception("Inserting item to database failed: {$e->getMessage()}.");
+			throw new \Exception("Inserting item to database failed: {$e->getMessage()}.");
 		}
 	}
 	
@@ -519,7 +519,7 @@ class Russert {
 		$result = file_put_contents(LOCKFILE, "Locked as of " . date('c'));
 		
 		if (!$result) {
-			throw new Exception("Error writing lockfile.");
+			throw new \Exception("Error writing lockfile.");
 		}
 		
 		// This will tell the program that the lock has been set within this run.
@@ -561,12 +561,14 @@ class Russert {
 	
 	function freeLock() : void {
 		if (!file_exists(LOCKFILE)) {
-			throw new Exception("File doesn't exist.");
+			throw new \Exception("File doesn't exist.");
 		}
 		
 		if (!unlink(LOCKFILE)) {
-			throw new Exception("Removing lockfile failed.");
+			throw new \Exception("Removing lockfile failed.");
 		}
+		
+		$this->locked = FALSE;
 	}
 	
 	
@@ -582,7 +584,7 @@ class Russert {
 			$this->connection = new MongoDB\Driver\Manager("mongodb://" . MONGODB_HOST);
 		}
 		catch (Exception $e) {
-			throw new Exception("Connecting to MongoDB failed: {$e->getMessage()}.");
+			throw new \Exception("Connecting to MongoDB failed: {$e->getMessage()}.");
 		}
 	}
 	
@@ -640,7 +642,7 @@ class Russert {
 			$result = mail(REPORT_EMAIL, "Critical Russert error(s)", $message);
 			
 			if (!$result) {
-				throw new Exception("Sending mail failed due to unknown error.");
+				throw new \Exception("Sending mail failed due to unknown error.");
 			}
 		}
 	}
