@@ -15,9 +15,11 @@ abstract class Source implements SourceInterface {
 	protected $hidden = FALSE;
 	protected $updated = FALSE;
 
+
 	/**
 	 * Constructor.
 	 */
+	
 	function __construct() {
 		// ":D"
 	}
@@ -28,6 +30,7 @@ abstract class Source implements SourceInterface {
 	 * @return String The pretty name of the source.
 	 * @author Joonas Kokko
 	 */
+	
 	public function getName() : string {
 		return $this->name;
 	}
@@ -40,6 +43,7 @@ abstract class Source implements SourceInterface {
 	 * @return void
 	 * @author Joonas Kokko
 	 */
+	
 	public function setName($name) : void {
 		$this->name = $name;
 	}
@@ -51,6 +55,7 @@ abstract class Source implements SourceInterface {
 	 * @return String Name of the class.
 	 * @author Joonas Kokko
 	 */
+	
 	public function getClassName() : string {
 		// https://coderwall.com/p/cpxxxw/php-get-class-name-without-namespace
 		$name = (new \ReflectionClass($this))->getShortName();
@@ -64,6 +69,7 @@ abstract class Source implements SourceInterface {
 	 * @return String The link.
 	 * @author Joonas Kokko
 	 */
+	
 	public function getLink() : string {
 		return $this->link;
 	}
@@ -76,6 +82,7 @@ abstract class Source implements SourceInterface {
 	 * @return void
 	 * @author Joonas Kokko
 	 */
+	
 	public function setLink($link) {
 		$this->link = $link;
 	}
@@ -87,6 +94,7 @@ abstract class Source implements SourceInterface {
 	 * @return String Description of the source.
 	 * @author Joonas Kokko
 	 */
+	
 	public function getDescription() : string {
 		return $this->description;
 	}
@@ -98,6 +106,7 @@ abstract class Source implements SourceInterface {
 	 * @return boolean Flag status.
 	 * @author Joonas Kokko
 	 */
+	
 	public function getHidden() : bool {
 		return $this->hidden;
 	}
@@ -127,6 +136,7 @@ abstract class Source implements SourceInterface {
 		$this->updated = $updated;
 	}
 	
+	
 	/**
 	 * Returns the HTML DOM.
 	 *
@@ -141,19 +151,19 @@ abstract class Source implements SourceInterface {
 		
 		$html = @file_get_contents($url);
 		
-		if ($html) {
-			$doc = new \DOMDocument();
-		  $doc->strictErrorChecking = FALSE;
-		  @$doc->loadHTML($html);
-		
-			if ($doc) {
-				return $doc;
-			}
-		}
-		else {
-			throw new \Exception("Couldn't get HTML.");
+		if (!$html) {
+			throw new \Exception("Couldn't get HTML from URL.", 5002);
 		}
 		
-		return FALSE;
+		$doc = new \DOMDocument();
+	  $doc->strictErrorChecking = FALSE;
+	  @$doc->loadHTML($html);
+	
+		// Couldn't even form a remotely valid DOMDocument.
+		if (!$doc) {
+			throw new \Exception("Couldn't parse HTML.", 5001);
+		}
+		
+		return $doc;
 	}
 }

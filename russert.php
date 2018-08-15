@@ -100,7 +100,7 @@ class Russert {
 			$this->handleIndex();
 		}
 		catch (Exception $e) {
-			$this->log("Things went wrong: {$e->getMessage}.", TRUE);
+			$this->log("Things went wrong: {$e->getMessage()}.", TRUE);
 		}
 	}
 	
@@ -186,6 +186,7 @@ class Russert {
 	 * @return void
 	 * @author Joonas Kokko
 	 */
+	
 	function loadSources(array $sources) {
 		foreach ($sources as $source) {
 			$this->sources[] = new $source;
@@ -320,6 +321,7 @@ class Russert {
 	 * @return void
 	 * @author Joonas Kokko
 	 */
+	
 	function handleIndex() {
 		if (!$this->generate_html) {
 			$this->log("Skipping index generation due to single source mode.");
@@ -345,6 +347,15 @@ class Russert {
 		}
 	}
 	
+	
+	/**
+	 * Saves an HTML index file to the disk.
+	 * TODO: Exceptions.
+	 *
+	 * @param array $sources 
+	 * @return boolean Success true/false.
+	 * @author Joonas Kokko
+	 */
 	
 	function saveIndexFile(array $sources) : bool {
 		ob_start();
@@ -376,7 +387,7 @@ class Russert {
 	
 	function itemExists(array $item) : bool {
 		if (empty($item['guid'])) {
-			throw new \Exception("Missing guid.");
+			throw new \Exception("Missing guid.", 5014);
 		}
 		
 		$guid = $item['guid'];
@@ -392,6 +403,7 @@ class Russert {
 		return TRUE;
 	}
 	
+	
 	/**
 	 * Returns an item from MongoDB by GUID.
 	 *
@@ -400,16 +412,16 @@ class Russert {
 	
 	function getItemByGuid(string $guid) : MongoDB\Model\BSONDocument {
 		if (empty($guid)) {
-			throw new \Exception("Invalid guid.");
+			throw new \Exception("Invalid guid.", 5013);
 		}
 		
-		$item = $this->collection->findOne(array('guid' => $guid));
+		$item = $this->collection->findOne([ 'guid' => $guid ]);
 		
 		if (!empty($item)) {
 			return $item;
 		}
 		else {
-			throw new \Exception("No item found.");
+			throw new \Exception("No item found.", 5012);
 		}
 	}
 	
@@ -421,6 +433,7 @@ class Russert {
 	 *
 	 * @return Mixed Array of items or false if nothing found.
 	 */
+	
 	function getLatestItemsBySource(object $source, int $limit = 20) : array {
 		$items = [];
 
@@ -433,13 +446,9 @@ class Russert {
 			foreach ($cursor as $item) {
 				$items[] = $item;
 			}
-			
-			if (empty($items)) {
-				throw new \Exception("No latest items found.");
-			}
 		}
 		catch (Exception $e) {
-			throw new \Exception("Getting latest items from source failed: {$e->getMessage()}.");
+			throw new \Exception("Getting latest items from source failed: {$e->getMessage()}.", 5010);
 		}
 		
 		return $items;
@@ -457,7 +466,7 @@ class Russert {
 	function saveItem(array $item, object $source) : void {
 		// Validate the item.
 		if (!$this->isItemValid($item)) {
-			throw new \Exception("Item is not valid.");
+			throw new \Exception("Item is not valid.", 5009);
 		}
 	
 		// Set date.
@@ -478,7 +487,7 @@ class Russert {
 			$result = $this->collection->insertOne($item);
 		}
 		catch (Exception $e) {
-			throw new \Exception("Inserting item to database failed: {$e->getMessage()}.");
+			throw new \Exception("Inserting item to database failed: {$e->getMessage()}.", 5008);
 		}
 	}
 	
@@ -505,10 +514,11 @@ class Russert {
 	
 	
 	/**
-	 * Set lock.
+	 * Sets lock.
 	 *
-	 * @return Boolean Success/fail.
-	 */	
+	 * @return void
+	 * @author Joonas Kokko
+	 */
 	
 	function setLock() : void {
 		// Lock is disabled.
@@ -519,7 +529,7 @@ class Russert {
 		$result = file_put_contents(LOCKFILE, "Locked as of " . date('c'));
 		
 		if (!$result) {
-			throw new \Exception("Error writing lockfile.");
+			throw new \Exception("Error writing lockfile.", 5007);
 		}
 		
 		// This will tell the program that the lock has been set within this run.
@@ -561,11 +571,11 @@ class Russert {
 	
 	function freeLock() : void {
 		if (!file_exists(LOCKFILE)) {
-			throw new \Exception("File doesn't exist.");
+			throw new \Exception("File doesn't exist.", 5006);
 		}
 		
 		if (!unlink(LOCKFILE)) {
-			throw new \Exception("Removing lockfile failed.");
+			throw new \Exception("Removing lockfile failed.", 5005);
 		}
 		
 		$this->locked = FALSE;
@@ -584,7 +594,7 @@ class Russert {
 			$this->connection = new MongoDB\Driver\Manager("mongodb://" . MONGODB_HOST);
 		}
 		catch (Exception $e) {
-			throw new \Exception("Connecting to MongoDB failed: {$e->getMessage()}.");
+			throw new \Exception("Connecting to MongoDB failed: {$e->getMessage()}.", 5004);
 		}
 	}
 	
@@ -595,11 +605,12 @@ class Russert {
 	 * @return boolean True/false.
 	 * @author Joonas Kokko
 	 */
+	
 	function ensureIndexes() : void {
 		try {
-			$this->collection->createIndex(array('guid' => 1));
-			$this->collection->createIndex(array('source' => 1));
-			$this->collection->createIndex(array('seen' => -1));
+			$this->collection->createIndex([ 'guid' => 1] );
+			$this->collection->createIndex([ 'source' => 1] );
+			$this->collection->createIndex([ 'seen' => -1] );
 		}
 		catch (Exception $e) {
 			$this->log("Creating indexes failed: {$e->getMessage()}.");
@@ -642,7 +653,7 @@ class Russert {
 			$result = mail(REPORT_EMAIL, "Critical Russert error(s)", $message);
 			
 			if (!$result) {
-				throw new \Exception("Sending mail failed due to unknown error.");
+				throw new \Exception("Sending mail failed due to unknown error.", 5003);
 			}
 		}
 	}
