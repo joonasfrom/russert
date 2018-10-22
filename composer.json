@@ -1,4 +1,12 @@
 {
+	"name": "joonaskokko/russert",
+	"type": "project",
+	"authors": [
+		{
+			"name": "Joonas Kokko",
+			"email": "joonas.from@gmail.com"
+		}
+	],
 	"autoload" : {
 		"psr-4" : {
 			"Russert\\" : [ "src/" ],

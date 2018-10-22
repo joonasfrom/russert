@@ -157,6 +157,7 @@ abstract class Source implements SourceInterface {
 		
 		$doc = new \DOMDocument();
 	  $doc->strictErrorChecking = FALSE;
+		$html = mb_convert_encoding($html, "HTML-ENTITIES", "UTF-8");
 	  @$doc->loadHTML($html);
 	
 		// Couldn't even form a remotely valid DOMDocument.
