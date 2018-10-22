@@ -243,7 +243,7 @@ class Russert {
 			}
 		}
 		catch (Exception $e) {
-			$this->log("Couldn't handle cargo: {$e->getMessage}.");
+			$this->log("Couldn't handle cargo: {$e->getMessage()}.");
 		}
 	}
 	
