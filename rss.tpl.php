@@ -12,6 +12,7 @@
 			<title><?=htmlspecialchars($item->title)?></title>
 			<link><?=htmlspecialchars($item->link)?></link>
 			<description>
+			<?php if (!empty($item->image) || !empty($item->description)):?>
 				<![CDATA[
 				<?php if (!empty($item->image)):?>
 				<img src="<?=$item->image;?>" alt="" />
@@ -20,6 +21,7 @@
 					<p><?=htmlspecialchars($item->description);?></p>
 				<?php endif;?>
 				]]>
+			<?php endif?>
 			</description>
 			<pubDate><?=date("r", ($item->seen->__toString() / 1000));?></pubDate>
 			<guid><?=htmlspecialchars($item->guid);?></guid>

@@ -149,7 +149,7 @@ abstract class Source implements SourceInterface {
 			$url = $this->getLink();
 		}
 		
-		$html = @file_get_contents($url);
+		$html = file_get_contents($url);
 		
 		if (!$html) {
 			throw new \Exception("Couldn't get HTML from URL.", 5002);
