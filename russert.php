@@ -296,16 +296,18 @@ class Russert {
 	function saveRssFile(array $items, object $source) : bool {
 		ob_start();
 		require("rss.tpl.php");
-		$html = ob_get_contents();
+		$xml = ob_get_contents();
 		ob_end_clean();
 		
 		$filename = RSS_FOLDER . "/" . $source->getClassName() . ".xml";
 		
 		if (!DEBUG_MODE) {
-			if (file_put_contents($filename, $html)) {
+			if (@file_put_contents($filename, $xml)) {
 				$this->log("RSS file saved.");
 				return TRUE;
 			}
+			else {
+				throw new \Exception("Couldn't save RSS file.", 5112);
 		}
 		else {
 			$this->log("Would save RSS file to {$filename}.");
