@@ -308,6 +308,7 @@ class Russert {
 			}
 			else {
 				throw new \Exception("Couldn't save RSS file.", 5112);
+			}
 		}
 		else {
 			$this->log("Would save RSS file to {$filename}.");
